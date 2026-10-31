@@ -1,4 +1,3 @@
-
 name: Predictive Maintenance Pipeline
 
 on:
@@ -10,9 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  train-and-save:
+  data-preparation:
     runs-on: ubuntu-latest
-
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -29,8 +27,46 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Prepare training and test data
+        run: python pipeline.py --prepare-only
+
+      - name: Upload train/test data artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: prepared-engine-data
+          path: |
+            outputs/train_data.csv
+            outputs/test_data.csv
+          if-no-files-found: error
+          retention-days: 7
+
+  model-building:
+    runs-on: ubuntu-latest
+    needs: data-preparation
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Download train/test data artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: prepared-engine-data
+          path: outputs/
+
       - name: Run model training pipeline
-        run: python pipeline.py
+        run: python pipeline.py --train-only
 
       - name: Commit generated models and results
         run: |
